@@ -54,6 +54,13 @@ func (h *Handler) handleLookup(c *gin.Context) {
 // handleAccess handles the access for incoming requests
 func (h *Handler) handleAccess(c *gin.Context) {
 	id := c.Request.URL.Path[1:]
+	idExt := ""
+
+	if b, a, ok := strings.Cut(id, "/"); ok {
+		id = b
+		idExt = a
+	}
+
 	entry, err := h.store.GetEntryAndIncrease(id)
 	if err != nil {
 		if strings.Contains(err.Error(), shared.ErrNoEntryFound.Error()) {
@@ -65,7 +72,7 @@ func (h *Handler) handleAccess(c *gin.Context) {
 	// No password set
 	if len(entry.Password) == 0 {
 		c.Redirect(http.StatusTemporaryRedirect, entry.Public.URL)
-		go h.registerVisitor(id, c)
+		go h.registerVisitor(id, idExt, c)
 		c.Abort()
 	} else {
 		templateError := ""
@@ -82,7 +89,7 @@ func (h *Handler) handleAccess(c *gin.Context) {
 			}()
 			if templateError == "" {
 				c.Redirect(http.StatusSeeOther, entry.Public.URL)
-				go h.registerVisitor(id, c)
+				go h.registerVisitor(id, "", c)
 				c.Abort()
 				return
 			}
@@ -210,8 +217,8 @@ func (h *Handler) getURLOrigin(c *gin.Context) string {
 	return fmt.Sprintf("%s://%s", protocol, c.Request.Host)
 }
 
-func (h *Handler) registerVisitor(id string, c *gin.Context) {
-	h.store.RegisterVisit(id, shared.Visitor{
+func (h *Handler) registerVisitor(id, idExt string, c *gin.Context) {
+	v := shared.Visitor{
 		IP:          c.ClientIP(),
 		Timestamp:   time.Now(),
 		Referer:     c.GetHeader("Referer"),
@@ -221,5 +228,17 @@ func (h *Handler) registerVisitor(id string, c *gin.Context) {
 		UTMCampaign: c.Query("utm_campaign"),
 		UTMContent:  c.Query("utm_content"),
 		UTMTerm:     c.Query("utm_term"),
-	})
+	}
+
+	// XXX: 将 ID 追加到 Term 字段。这不是一个最好的方法，这只是一个快速完成的补丁。
+	if idExt != "" {
+		var terms []string
+		if v.UTMTerm != "" {
+			terms = append(terms, v.UTMTerm)
+		}
+		terms = append(terms, idExt)
+		v.UTMTerm = strings.Join(terms, ";")
+	}
+
+	h.store.RegisterVisit(id, v)
 }

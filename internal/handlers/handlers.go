@@ -39,10 +39,10 @@ var templateBox = packr.New("Templates", "./tmpls")
 // Requests without errors are logged using logrus.Info().
 //
 // It receives:
-//   1. A time package format string (e.g. time.RFC3339).
-//   2. A boolean stating whether to use UTC time zone or local.
-//   3. Optionally, a list of paths to skip logging for (this is why
-//      we are not using upstream github.com/gin-gonic/contrib/ginrus)
+//  1. A time package format string (e.g. time.RFC3339).
+//  2. A boolean stating whether to use UTC time zone or local.
+//  3. Optionally, a list of paths to skip logging for (this is why
+//     we are not using upstream github.com/gin-gonic/contrib/ginrus)
 func Ginrus(logger loggerEntryWithFields, timeFormat string, utc bool, notlogged ...string) gin.HandlerFunc {
 	var skip map[string]struct{}
 	if length := len(notlogged); length > 0 {
@@ -200,7 +200,11 @@ func (h *Handler) setHandlers() error {
 		func(c *gin.Context) {
 			// if we get to this point we should not let the client cache
 			c.Header("Cache-Control", "no-cache, no-store")
-			c.Redirect(http.StatusTemporaryRedirect, "/?customUrl="+c.Request.URL.Path[1:])
+
+			// c.Redirect(http.StatusTemporaryRedirect, "/?customUrl="+c.Request.URL.Path[1:])
+
+			// TODO: 由 307 改为 302 跳转
+			c.Redirect(http.StatusFound, "/?customUrl="+c.Request.URL.Path[1:])
 		})
 	return nil
 }
